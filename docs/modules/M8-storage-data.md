@@ -18,13 +18,15 @@
 | 远程备份（可选） | 私有 GitHub remote（只推 markdown 仓库） |
 
 ## 3. 文件布局
+**以 M3 §2「唯一权威布局」为准**（outputs/uploads 在用户目录**内部**，不在顶层）：
 ```
-users/<user_id>/            # git 仓库（raw+wiki，见 M3 §2）
-outputs/<user_id>/<generation_id>/resume.pdf   # 二进制产物（本机）
-uploads/<user_id>/...        # 上传图片/证件照（本机）
+users/<user_id>/                 # git 仓库根
+  raw/  wiki/                     # 纳入 git
+  outputs/<generation_id>/resume.pdf   # 二进制产物（本机，不入 git）
+  uploads/...                     # 上传图片/证件照（本机，不入 git）
 ```
-- 每次 Ingest/Lint 一次 git 提交（可回滚）。
-- 二进制不入 git（避免膨胀）；只在文件系统 + MySQL 指针。
+- 一次"确认→入库"由**应用层**做一次原子提交（`git add raw/ wiki/` 后 commit，见 M3-FR-08），**非"每次 Ingest/Lint 各自提交"**。
+- 二进制（outputs/uploads）在用户目录内但**不纳入 git**（`git add` 只加 `raw/ wiki/`，避免仓库膨胀）；只存文件系统 + MySQL 指针。
 
 ## 4. MySQL 表结构（第一阶段核心）
 ```sql

@@ -91,5 +91,5 @@ section_titles_locale: zh | en | bilingual
 
 ## 10. 验收标准
 - ✅ 结构化数据渲染出 ATS 友好中/英/双语 PDF，文字可选中、排版整洁。
-- ✅ 照片默认关、可开；纸张随语言。
+- ✅ 照片默认关、可开；纸张**随地区**（na→Letter，cn/eu/other→A4）。
 - ✅ 令牌可改变风格；LLM 不可用时规则降级仍能出 PDF。
