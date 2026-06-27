@@ -22,7 +22,7 @@
 | M5-FR-05 | 渲染完整 basics（姓名/电话/邮箱/城市/headline + 按地区的 links），不只 name。 | MVP |
 | M5-FR-06 | 设计令牌参数化（§6），换风格=改令牌/换布局。 | MVP |
 | M5-FR-07 | 长度控制闭环：渲染后检测页数溢出，**回传溢出量给 M4**缩减重渲染（限最大重试次数，如 2 次）。 | MVP |
-| M5-FR-08 | 降级（GR-6）：LLM 不可用时，**由规则直接从 wiki/raw 抽取灌模板**（端到端降级，不依赖 M4 产出），出"完整但保守"的真实 ATS PDF。 | MVP |
+| M5-FR-08 | 降级（GR-6，**最小降级**避免重造选材器）：LLM 不可用时，优先渲染**最近一次成功的定稿**；若无，则渲染 **basics + 全部 bullet 原样平铺**的保守版。完整规则版选材为后续。 | MVP |
 | M5-FR-09 | 多套模板（技术/设计/学术/商务）。 | 后续 |
 | M5-FR-10 | 导出 DOCX。 | 后续 |
 | M5-FR-11 | 求职信（Cover Letter）。 | 后续 |
@@ -42,11 +42,12 @@
 - **文件名** `姓名_岗位_简历.pdf` 中"岗位"取 `_meta.params.headline` 或 JD 解析岗位，缺失时回退 headline。
 
 ## 5b. 地区内容规则表（GR-10，与 M4 共用）
-| 地区 | 照片/年龄/性别/婚姻/政治面貌 | 纸张 | 长度倾向 | links |
+| 地区(枚举) | 照片/年龄/性别/婚姻/政治面貌 | 纸张 | 长度倾向 | links |
 |---|---|---|---|---|
-| 北美（US/CA） | **禁用全部敏感字段**（反歧视） | Letter | 偏 1 页 | LinkedIn/GitHub |
-| 国内 | 常用照片/年龄/性别，部分场景政治面貌 | A4 | 1–2 页 | 可选 |
-| 其他（按需扩展） | 按当地规范 | A4 | — | — |
+| `na` 北美(US/CA) | **禁用全部敏感字段**（反歧视） | Letter | 偏 1 页 | LinkedIn/GitHub |
+| `cn` 国内 | 常用照片/年龄/性别，部分场景政治面貌 | A4 | 1–2 页 | 可选 |
+| `eu` 欧洲 | 多数禁照片/年龄（含 GDPR 倾向），按国细化 | A4 | 1–2 页 | LinkedIn |
+| `other` 其他 | 按当地规范（默认从严） | A4 | — | — |
 
 ## 6. 设计令牌
 ```yaml
@@ -62,7 +63,8 @@ section_titles_locale: zh | en | bilingual
 ```
 
 ## 7. 数据契约（输入）
-对齐 JSON Resume（见 [M4](M4-generation.md) §3）。映射：`basics`→Header、`summary`→Summary、`work[]/projects[]`→经历（`highlights`=bullet）、`skills[]`→技能（文字分级）、`education[]`→教育、`certificates[]/awards[]/languages[]`→附加区。忽略 `_source`/`_lang`/`_gaps`（供 M6/前端用，不渲染入正文）。
+对齐 JSON Resume（见 [M4](M4-generation.md) §3）。映射：`basics`→Header、`summary`→Summary、`work[]/projects[]`→经历（`highlights`=bullet）、`skills[]`→技能（文字分级）、`education[]`→教育、`certificates[]/awards[]/languages[]`→附加区。**只渲染主数据；并行 `_meta`（`source/lang/gaps`，统一无下划线前缀）不渲染入正文**，供 M6/前端用。
+- **basics 敏感字段职责分工（P2-7）**：M4 生成时按地区**主责不输出**越界字段；**M5 渲染层强制过滤为兜底**；M6 仅做合规校验报告。三层为防御性重复，主责在 M4。
 
 ## 8. 渲染器与 MVP 模板
 - 渲染器 **Typst**（单二进制、低内存、真文本 PDF、支持图片，契合 2核4G）；可参考 **RenderCV**。

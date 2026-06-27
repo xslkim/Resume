@@ -22,7 +22,7 @@
 | 操作 | 调用方 | CWD | 输入 | 输出 |
 |---|---|---|---|---|
 | Interview | M2 | 用户wiki | index概览/covered/skipped/target | focus+question 或 done |
-| Ingest | M2/M3 | `wiki/` | 确认条目/raw | 更新 wiki/index/log + 矛盾标记 |
+| Ingest | M2/M3 | `wiki/` | **已确认条目（经 stdin）** | 更新 wiki/index/log + 矛盾标记 |
 | Query | M4 | `wiki/` | 全量wiki+JD+长度/语言/地区 | 结构化简历数据(JSON Resume+sidecar) |
 | Lint（后续） | M3 | `wiki/` | 全量wiki | 问题清单 |
 
@@ -53,3 +53,7 @@
 - ✅ 四操作均能经 CLI 在用户 wiki 目录上执行并返回预期输出。
 - ✅ 密钥仅来自环境变量、代码无硬编码。
 - ✅ 串行生效；失败有重试与结构化错误；每次调用有审计记录。
+
+## 8. 实现前置与已知风险
+- **CLI 技术 spike（优先级前置）**：动业务模块前，先对四个操作各跑一次最小 `claude` CLI 调用，验证关键假设——非交互 stdin 输入、稳定 JSON 输出、CWD 隔离、默认模型/版本、成本/token 是否回传（M7-FR-06 待定项）。假设不成立则及早调整方案。
+- **文件竞态（即使单用户）**：CLI 运行期间用户可能经 M2 手动编辑同一 wiki 文件。约束：**CLI 运行期间对该用户 wiki 加文件级锁 / 置灰编辑入口**（可后续，但记为已知风险）。

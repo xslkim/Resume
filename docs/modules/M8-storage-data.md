@@ -28,7 +28,11 @@ uploads/<user_id>/...        # 上传图片/证件照（本机）
 
 ## 4. MySQL 表结构（第一阶段核心）
 ```sql
-users(id, username, password_hash, created_at)
+users(id, email UNIQUE, password_hash, created_at)   -- 登录用 email（M1-FR-01）
+
+sessions(                                      -- 服务端会话，支持登出/改密吊销（M1-FR-02/04/05）
+  id, user_id, token_hash, expires_at, revoked_at, created_at,
+  INDEX(user_id))
 
 interview_sessions(                            -- 字段对应 M2 §4 状态机 / §6 会话状态
   id, user_id, state, current_focus,

@@ -9,20 +9,26 @@
 - **做**：定义并执行 wiki schema；Ingest；Lint；维护 raw（只读不可变）、wiki、index、log；git 版本化。
 - **不做**：提问/抽取（M2）、生成简历（M4）。LLM 调用经 [M7](M7-llm-orchestration.md)，文件落盘经 [M8](M8-storage-data.md)。
 
-## 2. 目录与文件布局（每用户）
+## 2. 目录与文件布局（每用户，唯一权威布局）
 ```
-users/<user_id>/
-  raw/                       # 不可变原始素材，只读
+users/<user_id>/             # git 仓库根（应用代码管理提交）
+  raw/                       # 不可变原始素材；应用代码写，LLM 不读不写（在 wiki/ 外）
     <yyyy-mm-dd>-<type>-<slug>.md
-  wiki/
+  outputs/<generation_id>/   # 生成的 PDF/DOCX（见 M8）
+  uploads/                   # 上传图片/证件照（见 M8）
+  wiki/                      # CLI 的 CWD；LLM 在此读写
     experiences/<slug>.md    # 经历页（教育/工作/项目）
     skills/<slug>.md         # 技能/证书/奖项页
     topics/<slug>.md         # 主题摘要/综合页（后续）
-  index.md                   # 内容目录
-  log.md                     # 时间线
-  schema.md                  # 本模块定义的契约（页面规则 + 操作流程）
+    profile/basics.md        # 个人信息页（§3.6）
+    index.md                 # 内容目录（§3.4）
+    schema.md                # 契约：页面规则 + 操作 prompt（M7-FR-02）
+    issues.md                # 矛盾记录（§3.7）
+    log.md                   # 时间线（§3.5）
 ```
-全目录由 git 管理；每次 Ingest/Lint 为一次提交（NFR 可靠性）。
+- **`raw/` 在 `wiki/` 之外**：CLI 的 CWD=`wiki/`，物理上接触不到 `raw/`（机制隔离 GR-1，配合 M7）。
+- **wiki/ 内所有契约文件就地可读**（CWD=`wiki/` 时无需跨级）。
+- git 仓库根在 `users/<user_id>/`；**一次"确认→入库"由应用层做原子提交**（raw+wiki 一起，见 M3-FR-08），可回滚到一致快照。
 
 ## 3. wiki 内容 schema（契约，必须固化）
 
@@ -34,6 +40,9 @@ users/<user_id>/
 - LLM **不得新增 schema 之外的字段或页面类型**（违反则 Lint 报警，GR-7）。
 - **raw 写入机制（红线）**：`raw/` 由**应用代码在用户确认后写入**，LLM 只读不写；Ingest/Query 的 CLI **工作目录设为 `wiki/`**（而非用户根目录），从机制上隔离 LLM 对 raw 的写权限（配合 M7）。
 - **内容时效**：含时间属性的内容默认带"最后相关时间"意识；远期经历/过时技能在 Query 选材中**默认降权**（见 M4），陈旧内容不污染生成。
+- **raw 内部结构与锚点（溯源最后一跳）**：raw 文件为 markdown + YAML frontmatter（`id/type/date/source_kind`）；正文按"原子事实块"切分，每块带块锚点 `^a/^b/...`（应用代码在写入时分配）。bullet 的 `source: <raw文件>#a` 即指向该块，`verify_against_raw`（M6）据此做结构化匹配。
+- **slug 生成与路径安全**：slug 由内容标题转写（中文取拼音，附短哈希去重），仅允许 `[a-z0-9-]`，长度上限（如 50）；清洗 `..`/`/` 防路径遍历。
+- **Ingest 的输入来自应用经 stdin 传入的"已确认条目"**，Ingest（CWD=wiki/）不读 raw；raw 与 wiki 由同一份确认条目分别落盘 → 二者同源一致（GR-7 的 MVP 保证方式）。
 
 ### 3.2 经历页 `experiences/<slug>.md`
 frontmatter 与成就颗粒均为**结构化对象**（修正旧示例的行内 flow / block 混排）：
@@ -68,7 +77,7 @@ bullets:                             # 成就颗粒（结构化对象数组）
 (English narrative)
 ```
 - 成就颗粒 = `{id, source, skills, star?, metrics?, text:{zh,en}}`。**允许纯定性 bullet**（无 metrics）；`skills` 即"技能↔成就印证"标签（替代建图）。
-- bullet 质量规则（GR-3）：优先真实可量化结果；禁止空泛动词堆砌（"负责/参与了…"而无结果）；指标按价值梯度（营收/成本 > 用户/规模 > 速度/效率 > 代码行数）。
+- bullet 质量规则（GR-3，详见 M4 §7 内容质量规范）：优先真实可量化结果；禁止空泛动词堆砌（"负责/参与了…"而无结果）；指标按价值梯度（营收/成本 > 用户/规模 > 速度/效率）。**"代码行数"等是公认坏指标，禁止作为成就量化**。
 
 ### 3.3 技能/证书页 `skills/<slug>.md`
 ```yaml
@@ -86,6 +95,7 @@ sources: [raw/...]
 （可选补充说明，双语）
 ```
 - **level × 印证一致性**：自评 `level` 高（如"精通"）但 `evidenced_by` 为空 → Ingest 标记提示（GR-2），避免"印证机制形同虚设"。
+- **保守自评纪律**：`level` 按"**能通过目标岗位面试追问**"的标准，宁可下调一档——写"精通"却面试露馅比不写更伤（见 M4 §7）。`years` 不可超过经历时间跨度。
 - **软技能不单列空泛词**：用具体成就体现（与 `evidenced_by` 呼应），不写"优秀的沟通能力"这类空话。
 - **type vs tag**：`type` 是内容类型（skill/certificate/award/language），`tag` 是横切分类，二者正交。
 
@@ -136,15 +146,18 @@ sources: [raw/...]
 | M3-FR-05 | 维护 index.md 与 log.md。 | MVP |
 | M3-FR-06 | Ingest 遇矛盾（时间冲突/同机构信息不一致/头衔年限不符）标记，不静默覆盖（GR-2）。 | MVP |
 | M3-FR-07 | "技能↔成就印证"用 `skills`/`evidenced_by` 标签表达，不建图。 | MVP |
-| M3-FR-08 | 每次 Ingest/Lint 提交 git（可回滚）。 | MVP |
-| M3-FR-09 | Lint：自检矛盾/过时/孤儿页（无入链）/缺失交叉引用/缺口。**GR-7 在 MVP 仅靠 Ingest 纪律保证，系统级漂移检测随本项在后续引入。** | 后续 |
+| M3-FR-08 | **一次"确认→入库"由应用层做一次原子 git 提交**（`git add raw/ wiki/` 后 commit，单次、可回滚到一致快照）；提交方是应用，不是 CLI。 | MVP |
+| M3-FR-09 | Lint：自检矛盾/过时/孤儿页（无入链）/缺失交叉引用/缺口。**GR-7 在 MVP 靠"raw 与 wiki 同源于同一份确认条目"保证一致，系统级漂移检测随本项在后续引入。** | 后续 |
 | M3-FR-10 | 回填：Query 的好结果沉淀为新 topic 页供复用。 | 后续 |
-| M3-FR-11 | 提供"wiki 状态摘要"接口（index 概览 + 缺口 + token 估算）供 M2 提问、M4 生成读取与规模判断。 | MVP |
+| M3-FR-11 | 提供"wiki 状态摘要"接口（index 概览 + 缺口 + **字符数/段数估算**，不依赖 token 分词）供 M2 提问、M4 生成读取与规模判断。 | MVP |
 | M3-FR-12 | 维护 basics 页（§3.6），区分必选/按地区敏感字段。 | MVP |
 | M3-FR-13 | 经历页支持 employment_type/team_size/reports_to；技能页支持 years/last_used/level×印证一致性提示。 | MVP |
 | M3-FR-14 | 成就颗粒按 §3.2 结构（star?/metrics?/text），允许纯定性；执行 bullet 质量规则。 | MVP |
-| M3-FR-15 | raw 由应用代码在用户确认后写入，LLM 不写 raw；Ingest CWD=`wiki/`。 | MVP |
-| M3-FR-16 | 矛盾以 `issues.md` 记录并维护 open/resolved 生命周期（§3.7）。 | MVP |
+| M3-FR-15 | raw 由应用代码在用户确认后写入，LLM 不写 raw；Ingest CWD=`wiki/`、输入为应用经 stdin 传入的已确认条目。 | MVP |
+| M3-FR-16 | 矛盾以 `wiki/issues.md` 记录并维护 open/resolved 生命周期（§3.7）。 | MVP |
+| M3-FR-17 | 规定 raw 文件内部结构与块锚点（§3.1），供 `verify_against_raw` 结构化匹配。 | MVP |
+| M3-FR-18 | **软删除跳过机制**：被软删的 raw 条目带 `deleted: true`（或 tombstone），Ingest 须读取并**跳过**，避免重编译把已删内容编回 wiki。 | MVP |
+| M3-FR-19 | slug 生成与路径清洗规则（§3.1）。 | MVP |
 
 ## 5. 接口与数据
 - 输入：M2 的确认条目 / raw。
