@@ -164,6 +164,8 @@ raw + wiki + git 在**本机文件系统**（事实源）；结构化数据在**
 ## 8. 文档索引
 
 - 框架（本文件）：`REQUIREMENTS.md`
+- 技术栈与工程约定（实现层强制约定）：`TECH-STACK.md`
+- 开发任务清单（面向自动开发）：`TASKS.md`
 - [M1 用户与账号](modules/M1-user-auth.md)
 - [M2 素材录入](modules/M2-intake.md)
 - [M3 知识库引擎](modules/M3-knowledge-base.md)

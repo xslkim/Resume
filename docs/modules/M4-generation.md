@@ -52,8 +52,8 @@
 ## 4. 关键流程
 ```
 JD 文本 → 抽关键词
-     → Query(CLI, CWD=用户wiki)：读全量 wiki + JD + 长度/语言
-        → 选材 + 润色 → 结构化数据(JSON Resume + _source/_lang + _gaps)
+     → Query(CLI, CWD=用户wiki)：读全量 wiki + JD + 长度/语言/地区
+        → 选材 + 润色 → 结构化数据(JSON Resume 主数据 + _meta sidecar)
      → 草稿预览 → (M6 后置校验) → 定稿 → (M5 渲染)
 ```
 
